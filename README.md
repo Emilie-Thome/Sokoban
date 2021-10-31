@@ -1,2 +1,2 @@
 # Sokoban
-Sokoban project in C
+Sokoban project from C course at ISAE-SUPAERO.
