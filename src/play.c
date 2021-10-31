@@ -1,0 +1,144 @@
+#include <stdbool.h>
+#include <stdlib.h>
+
+#include "gui.h"
+#include "sokoban.h"
+
+
+
+
+void print_level(int width, int height, char* elements, int nb_mvmt) {
+
+    char *buffer = (char*)calloc(width, sizeof(char));
+
+    for(int i = 0; i < width; i++){ /*initialization*/
+        *(buffer + i) = '#';
+    }
+
+    GUI_Prep(1, 0, ' ');    /* There was a pb, the *(buffer + 1) does not print because of the '\0 added*/
+    *(buffer + 2) = ' ';    /* it is more esthetical ^^ */
+
+
+    snprintf (buffer, sizeof(char) * width, "%d",nb_mvmt); // print int 'nb_mvmt' into the char[] buffer
+
+    for (int col = 0; col < width; col++){
+        GUI_Prep(col, 0, *(buffer + col));
+    }
+
+    free(buffer);
+
+    for (int line = 0; line < height; line++){
+        for (int col = 0; col < width; col++){
+            GUI_Prep(col, line + 1, *(elements + line*width + col));
+        }
+    }
+
+    GUI_Show();
+}
+
+int main(int argc, char *argv[]) {
+	// testing if a filename has been given
+    if (argc != 2) {
+        fprintf(stderr, "You must provide a file name!\n");
+        exit(EXIT_FAILURE);
+    }
+    // open file. The filename is the first argument on the command
+    // line, hence stored in argv[1]
+    FILE *p_file = NULL;
+    p_file = fopen(argv[1], "r");
+    if (p_file == NULL) {
+        fprintf(stderr, "Cannot read file %s!\n", argv[1]);
+        exit(EXIT_FAILURE);
+    }
+ 
+    map* p_loaded_map = load(p_file); /*loading*/
+
+    int width = (*p_loaded_map).width; /*define the dimension*/
+    int height = (*p_loaded_map).height;
+
+    GUI_Init("Sokoban", width, height + 1);
+    
+    map* p_map_result = p_loaded_map; /*the name of the map that will change*/
+
+    char* elements = (*p_map_result).elements;
+
+    int nb_mvmt = (*p_map_result).nb_mvmt;
+
+	
+	//this is for the resart
+    map* p_map_restart = copy_map(*p_loaded_map);
+
+
+
+    char answer_player = 'a'; /*"a" because I don't want it to be a "q" at the begining!*/
+    bool WIN = SokoWin(*p_map_result); /*is it a won map?*/
+
+    while ((!WIN)&&(answer_player != 'q')){ /*while the game is on*/
+        // print the map before the movement
+    	print_level(width, height, elements, nb_mvmt);
+
+        //ask the movement or the quitting
+        switch (GUI_GetKey()) {
+        case SDLK_UP:
+            answer_player = 'N';
+            break;
+        case SDLK_DOWN:
+            answer_player = 'S';
+            break;
+        case SDLK_LEFT:
+            answer_player = 'W';
+            break;
+        case SDLK_RIGHT:
+            answer_player = 'E';
+            break;
+        case 'q':
+            answer_player = 'q';
+            break;
+        case 'r':
+        	answer_player = 'r';
+        }
+
+        //movement if the player want to continue
+        if((answer_player != 'q')&&(answer_player != 'r')){ /*but not restart*/
+            map* map_trash = p_map_result;
+            p_map_result = move(p_map_result, answer_player);
+            //free memory
+            if (p_map_result != map_trash){
+                deallocate_map(map_trash);
+            }
+        }else{
+            if(answer_player == 'r'){ /*if the player want to restart the game...*/
+                map* map_trash = p_map_result;
+                p_map_result = copy_map(*p_map_restart);
+                if (p_map_result != map_trash){
+                    deallocate_map(map_trash);
+                }
+            }
+        }
+
+        elements = (*p_map_result).elements;/*change the elements of the map*/
+
+        nb_mvmt = (*p_map_result).nb_mvmt;/* change the number of movements of the player*/
+
+        WIN = SokoWin(*p_map_result); /*is the new map a won map?*/   
+    }
+
+    if(answer_player != 'q'){ /*is the game has ended not because of a 'q' command*/
+        print_level(width, height, elements, nb_mvmt);
+        Pause(500);
+        GUI_click_button(width, height);
+        
+        WaitClick();
+        deallocate_map(p_map_restart);
+        deallocate_map(p_map_result);
+        GUI_Close(EXIT_SUCCESS);
+
+        return 0;
+
+    }else{ /*else, the game end*/
+    	deallocate_map(p_map_restart);
+        deallocate_map(p_map_result);
+    	GUI_Close(EXIT_SUCCESS);
+        return 0;
+    }
+}
